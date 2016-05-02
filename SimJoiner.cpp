@@ -15,19 +15,23 @@ int SimJoiner::joinJaccard(const char *filename1, const char *filename2, double 
 
 int SimJoiner::joinED(const char *filename1, const char *filename2, unsigned threshold, vector<EDJoinResult> &result) {
     result.clear();
-    readData(string(filename1),threshold);
+    readData(string(filename2),threshold);
     unordered_map<int,LengthGroup>::iterator it;
+    //cout<<"*"<<records[14294].size()<<endl;
     for(it = groups.begin();it!=groups.end();it++){
         it->second.gen_lists();
     }
     gen_group_lens();
 
-    readQuery(string(filename2));
+    readQuery(string(filename1));
     vector<int>candidate;
     for(int i = 0;i<queries.size();i++){
         string query = queries[i].str;
         candidate.clear();
         gen_candidate(query,threshold,candidate);
+//        if(i==591&&find(candidate.begin(),candidate.end(),14294)!=candidate.end()){
+//            cout<<"have it"<<endl;
+//        }
         verify(i,query,candidate,threshold,result);
     }
     return SUCCESS;
@@ -47,21 +51,28 @@ void SimJoiner::readData(string filename,int tau){
     fin.close();
 }
 
-void SimJoiner::gen_candidate(string query,int tau,vector<int>&candidate){
+void SimJoiner::gen_candidate(const string& query,int tau,vector<int>&candidate){
     int len = query.length();
     int llen = len-tau;
     int ulen = len+tau;
     vector<int>::iterator it = lower_bound(group_lens.begin(),group_lens.end(),llen);
     for(;it!=group_lens.end();it++){
+//        if(*it==5){
+//            switcher2 = true;
+//        }
         if(*it>ulen) break;
         vector<string> substrs;
         LengthGroup* group = &groups[*it];  //可加速
-        int delta = abs(len - group->len);
+//        if(switcher1&&*it==5){
+//            switcher1 = switcher2 = false;
+//        }
+        int delta = len - group->len;
         for(int i = 0;i<group->lists.size();i++){
             int p = group->lists[i].start_pos;
             int id = group->lists[i].id;
             gen_substrs(query,tau,p,delta,id,group->s[i],substrs);
         }
+
         for(int j = 0;j<substrs.size();j++){
             for(int i = 0;i<group->lists.size();i++){
                 if(group->lists[i].invlist.find(substrs[j])!=group->lists[i].invlist.end()){
@@ -69,7 +80,6 @@ void SimJoiner::gen_candidate(string query,int tau,vector<int>&candidate){
                     for(;pointer!=group->lists[i].invlist[substrs[j]].end();pointer++){
                         candidate.push_back(*pointer);
                     }
-                    break;
                 }
             }
         }
@@ -81,9 +91,10 @@ void SimJoiner::test(string filename1,string filename2){
     vector<EDJoinResult> resultED;
     int tau = 3;
     joinED(filename1.c_str(),filename2.c_str(),tau,resultED);
-//    for(int i = 0;i<resultED.size();i++){
-//        cout<<resultED[i].id1<<' '<<resultED[i].id2<<' '<<resultED[i].s<<endl;
-//    }
+    for(int i = 0;i<resultED.size();i++){
+        cout<<resultED[i].id1<<' '<<resultED[i].id2<<' '<<resultED[i].s<<endl;
+    }
+    cout<<"total records number:"<< resultED.size()<<endl;
 }
 
 void SimJoiner::gen_group_lens() {
@@ -103,7 +114,7 @@ void SimJoiner::readQuery(string filename){
     }
 }
 
-void SimJoiner::gen_substrs(string& query,int tau,int p,int delta,int id,int len,vector<string>& substrs){
+void SimJoiner::gen_substrs(const string& query,int tau,int p,int delta,int id,int len,vector<string>& substrs){
     //采用multi-match策略
     int t1= id-1;
     int t2 = tau-t1;
@@ -117,32 +128,38 @@ void SimJoiner::gen_substrs(string& query,int tau,int p,int delta,int id,int len
     }
 }
 
-void SimJoiner::verify(int id2,const string query,const vector<int>&candidate,int tau,vector<EDJoinResult>&result){
+void SimJoiner::verify(int id2,const string& query,const vector<int>&candidate,int tau,vector<EDJoinResult>&result){
     for(int i = 0;i<candidate.size();i++){
         int len1 = records[candidate[i]].length();
         int len2 = query.length();
-        int ed = len1<len2? calED(records[candidate[i]],query,tau):calED(query,records[candidate[i]],tau);
+        int ed = -1;
+        if(len1<len2){
+            ed = calED(records[candidate[i]],query,tau);
+        }
+        else{
+            ed = calED(query,records[candidate[i]],tau);
+        }
+
         if(ed>-1&&ed<=tau){
             EDJoinResult r;
-            r.id1 =candidate[i];
-            r.id2 = id2;
+            r.id1 =id2;
+            r.id2 =candidate[i];
             r.s = ed;
             result.push_back(r);
         }
     }
 }
 
-int SimJoiner::calED(const string s1,const string s2,int threshold){
+int SimJoiner::calED(const string& s1,const string& s2,int threshold){
     int row = s1.length();
     int col = s2.length();
 
     for(int i =0;i<=threshold&&i<=col;i++)d[0][i]=i;
     for(int i = 0;i<=threshold&&i<=row;i++)d[i][0]=i;
-    int start;int end;int last_end;
+    int start;int end;int last_end = threshold<col?threshold:col;
     int count = 0;
     for(int i = 1;i<=row;i++){
         count = 0;
-        last_end = end;
         start = (i-threshold>1)?(i-threshold):1;
         end = (i+threshold)<col?(i+threshold):col;
         for(int j = start;j<=end;j++){
@@ -169,7 +186,6 @@ int SimJoiner::calED(const string s1,const string s2,int threshold){
                     d[i][j] = min(deletion,match);
                     if(d[i][j]>threshold) count++;
                 }
-
             }
             else{
                 int cost = s1[i-1]==s2[j-1]? 0:1;
@@ -180,6 +196,7 @@ int SimJoiner::calED(const string s1,const string s2,int threshold){
                 if(d[i][j]>threshold) count++;
             }
         }
+        last_end = end;
         if(count == end-start+1) return -1;
     }
     return d[row][col];

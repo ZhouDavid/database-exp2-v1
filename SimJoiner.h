@@ -105,11 +105,12 @@ public:
     void readData(string filename,int tau);
     void readQuery(string filename);
     void gen_group_lens();
-    void gen_candidate(string query,int tau,vector<int>&candidate);
-    void gen_substrs(string&,int,int,int,int,int,vector<string>&substrs);
-    void verify(int id2,const string query,const vector<int>&candidate,int tau,vector<EDJoinResult>&result);
+    void gen_candidate(const string& query,int tau,vector<int>&candidate);
+    void gen_substrs(const string&,int,int,int,int,int,vector<string>&substrs);
+    void verify(int id2,const string& query,const vector<int>&candidate,int tau,vector<EDJoinResult>&result);
     void test(string filename1,string filename2);
-    int calED(const string s1,const string s2,int tau);
+    int calED(const string& s1,const string& s2,int tau);
     static int min3(int a,int b,int c){int t = a<b?a:b;return t<c?t:c;}
+    static bool sort_result(const EDJoinResult& r1,const EDJoinResult& r2);
 };
 #endif
