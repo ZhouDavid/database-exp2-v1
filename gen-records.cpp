@@ -3,11 +3,11 @@
 #include <string>
 #include <ctime>
 #include <cstdlib>
-#define RECORD_NUM 100000
+#define RECORD_NUM 1000
 using namespace std;
 int main(){
 	srand((unsigned)time(NULL));
-	ofstream o("dataset.txt");
+	ofstream o("query.txt");
 	int width1 = 'z'-'a';
 	int width2 = 'Z'-'A';
 	for(int i = 0;i<RECORD_NUM;i++){

@@ -10,7 +10,7 @@ SimSearcher::~SimSearcher()
 {
 }
 
-int SimSearcher::createIndex(const char *filename, unsigned q)
+int SimSearcher::edCreateIndex(const char *filename, unsigned q)
 {
     this->qq = q;
     ifstream fin(filename);
@@ -18,17 +18,17 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
     int id = 0;
     if(!fin){cout<<"could not open file!";return FAILURE;}
     //invertList.rehash(BUCKET_COUNT);
-    smin = 1023;
+    //smin = 1023;
     while(getline(fin,line)){
-        records.push_back(line);
+        edRecords.push_back(line);
         updateList(line,id);
-        int word_size = updateWordList(line,id);
-        word_counter.push_back(word_size);
-        if(smin > word_size)smin = word_size;
+        //int word_size = updateWordList(line,id);
+        //word_counter.push_back(word_size);
+        //if(smin > word_size)smin = word_size;
         id++;
     }
 
-    recordSize = records.size();
+    edRecordSize = edRecords.size();
 //    for(unordered_map<string,vector<int> >::iterator it=invertList.begin();it!=invertList.end();it++){
 //        listSize.push_back(pair<string,int>(it->first,it->second.size()));
 //    }
@@ -38,8 +38,28 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
 //    for(int i = 0;i<listSize.size();i++){
 //        position[listSize[i].first] = i;
 //    }
+    fin.close();
+    return SUCCESS;
+}
 
+int SimSearcher::jaccardCreateIndex(const char *filename)
+{
+    ifstream fin(filename);
+    string line;
+    int id = 0;
+    if(!fin){cout<<"could not open file!";return FAILURE;}
+    //invertList.rehash(BUCKET_COUNT);
+    smin = 1023;
+    while(getline(fin,line)){
+        jaccardRecords.push_back(line);
+        //updateList(line,id);
+        int word_size = updateWordList(line,id);
+        word_counter.push_back(word_size);
+        if(smin > word_size)smin = word_size;
+        id++;
+    }
 
+    jaccardRecordSize = jaccardRecords.size();
     fin.close();
     return SUCCESS;
 }
@@ -56,7 +76,7 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
     vector<int> candidate;
     int word_size = words.size();
     int T = my_max(threshold*word_size,(smin+word_size)*threshold/(threshold+1));
-    scanCount(this->word_invertList,words,T,candidate);
+    scanCount(jaccardRecordSize,this->word_invertList,words,T,candidate);
     sort(candidate.begin(),candidate.end());
     if(T>=1){
         int size = candidate.size();
@@ -67,12 +87,11 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
         }
     }
     else{
-        for(int i = 0;i<recordSize;i++){
+        for(int i = 0;i<jaccardRecordSize;i++){
             double jaccard = double(counters[i])/double(word_counter[i]+word_size-counters[i]);
             if(jaccard>=threshold) result.push_back(pair<unsigned,double>(i,jaccard));
         }
     }
-
     return SUCCESS;
 }
 
@@ -89,34 +108,34 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
     int T = len1-qq+1-thrs*qq;
     if(T>=1){
         vector<int>candidate;
-        scanCount(this->gram_invertList,grams,T,candidate);
+        scanCount(edRecordSize,this->gram_invertList,grams,T,candidate);
         int size = candidate.size();
         sort(candidate.begin(),candidate.end());
         for(int i = 0;i<size;i++){
             int id = candidate[i];
-            int len2 = records[id].length();
+            int len2 = edRecords[id].length();
             if(abs(len1-len2)>thrs) continue;
             int distance = 0;
             if(len1<len2){
-                distance = calED(q,records[id],thrs);
+                distance = calED(q,edRecords[id],thrs);
             }
             else{
-                distance = calED(records[id],q,thrs);
+                distance = calED(edRecords[id],q,thrs);
             }
             if(distance == -1) continue;
             if(distance<=thrs) result.push_back(pair<unsigned,unsigned>(id,distance));
         }
     }
     else{
-        for(int i = 0;i<recordSize;i++){
-            int len2 = records[i].length();
+        for(int i = 0;i<edRecordSize;i++){
+            int len2 = edRecords[i].length();
             if(abs(len1-len2)>thrs) continue;
             int distance = 0;
             if(len1<len2){
-                distance = calED(q,records[i],thrs);
+                distance = calED(q,edRecords[i],thrs);
             }
             else{
-                distance = calED(records[i],q,thrs);
+                distance = calED(edRecords[i],q,thrs);
             }
             if(distance == -1) continue;
             if(distance<=thrs) result.push_back(pair<unsigned,unsigned>(i,distance));
@@ -216,9 +235,9 @@ int SimSearcher::updateWordList(const string& s,int id){
 }
 
 
-void SimSearcher::scanCount(unordered_map<string,vector<int> >&invertList,const vector<string>& grams,int T,vector<int>& candidate){
+void SimSearcher::scanCount(int size,unordered_map<string,vector<int> >&invertList,const vector<string>& grams,int T,vector<int>& candidate){
     int gsize = grams.size();
-    for(int i = 0;i<recordSize;i++) counters[i] = 0;
+    for(int i = 0;i<size;i++) counters[i] = 0;
     unordered_map<string,vector<int> >::iterator it;
     for(int i = 0;i<gsize;i++){
         it = invertList.find(grams[i]);
@@ -416,23 +435,35 @@ SimJoiner::~SimJoiner(){
 
 }
 
-int SimJoiner::readQuery(const string filename){
+int SimJoiner::readEdQuery(const string filename){
     ifstream fin(filename);
     if(!fin){return FAILURE;}
     string query;
     while(getline(fin,query)){
-        queries.push_back(query);
+        ed_queries.push_back(query);
     }
     fin.close();
     return SUCCESS;
 
 }
+
+int SimJoiner::readJaccardQuery(const string filename){
+    ifstream fin(filename);
+    if(!fin){return FAILURE;}
+    string query;
+    while(getline(fin,query)){
+        jaccard_queries.push_back(query);
+    }
+    fin.close();
+    return SUCCESS;
+}
+
 int SimJoiner::joinED(const char *filename1, const char *filename2, unsigned threshold, std::vector<EDJoinResult> &result){
-    searcher.createIndex(filename2,3);
-    readQuery(filename1);
+    searcher.edCreateIndex(filename2,3);
+    readEdQuery(filename1);
     vector<pair<unsigned ,unsigned> > res;
-    for(int i  =0;i<queries.size();i++){
-        string query = queries[i];
+    for(int i  =0;i<ed_queries.size();i++){
+        string query = ed_queries[i];
         res.clear();
         searcher.searchED(query.c_str(),threshold,res);
         for(int j = 0;j<res.size();j++){
@@ -447,15 +478,34 @@ int SimJoiner::joinED(const char *filename1, const char *filename2, unsigned thr
 
 int SimJoiner::joinJaccard(const char *filename1, const char *filename2, double threshold, std::vector<JaccardJoinResult> &result){
     result.clear();
+    readJaccardQuery(filename1);
+    searcher.jaccardCreateIndex(filename2);
+    vector<pair<unsigned,double>>res;
+    for(int i = 0;i<jaccard_queries.size();i++){
+        searcher.searchJaccard(jaccard_queries[i].c_str(),threshold,res);
+        for(int j =0 ;j<res.size();j++){
+            JaccardJoinResult r;
+            r.id1 = i;r.id2 = res[j].first;r.s = res[j].second;
+            result.push_back(r);
+        }
+
+    }
     return SUCCESS;
 }
 
 void SimJoiner::test(string filename1,string filename2){
-    vector<EDJoinResult> resultED;
-    int tau = 3;
-    joinED(filename1.c_str(),filename2.c_str(),tau,resultED);
-    for(int i = 0;i<resultED.size();i++){
-        cout<<resultED[i].id1<<' '<<resultED[i].id2<<' '<<resultED[i].s<<endl;
+//    vector<EDJoinResult> resultED;
+//    int tau = 3;
+//    joinED(filename1.c_str(),filename2.c_str(),tau,resultED);
+//    for(int i = 0;i<resultED.size();i++){
+//        cout<<resultED[i].id1<<' '<<resultED[i].id2<<' '<<resultED[i].s<<endl;
+//    }
+//    cout<<"total records number:"<< resultED.size()<<endl;
+    vector<JaccardJoinResult> resultJaccard;
+    double tau = 0.75;
+    joinJaccard(filename1.c_str(),filename2.c_str(),tau,resultJaccard);
+    for(int i=0;i<resultJaccard.size();i++){
+        cout<<resultJaccard[i].id1<<' '<<resultJaccard[i].id2<<' '<<resultJaccard[i].s<<endl;
     }
-    cout<<"total records number:"<< resultED.size()<<endl;
+    cout<<"total jaccard records number:"<<resultJaccard.size()<<endl;
 }

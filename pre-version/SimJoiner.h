@@ -27,7 +27,8 @@ const int FAILURE = 1;
 class SimSearcher
 {
 public:
-	vector<string> records;
+	vector<string> edRecords;
+	vector<string> jaccardRecords;
 	unordered_map<string,vector<int> > gram_invertList;
 	unordered_map<string,vector<int> > word_invertList;
 	//vector<pair<string,int> > listSize;  // 记录每个qgram-list的 size,并排序
@@ -37,7 +38,8 @@ public:
 	}
 	static bool heap_comp(pair<int,int> a,pair<int,int>b){return (a.second > b.second);}
 	double my_max(double a,double b){return a>b?a:b;}
-	int recordSize;
+	int edRecordSize;
+	int jaccardRecordSize;
 	int qq;
 	int d[256][256];
 	int counters[220000];
@@ -46,7 +48,7 @@ public:
 
 	int calED(const string& s1,const string& s2,int threshold);
 	int min3(int a,int b,int c){int t = a<b?a:b;return t<c?t:c;}
-	void scanCount(unordered_map<string,vector<int> >&invertList,const vector<string>& grams,int T,vector<int>& candidate);
+	void scanCount(int size,unordered_map<string,vector<int> >&invertList,const vector<string>& grams,int T,vector<int>& candidate);
 	void updateList(const string& s,int id);
 	int updateWordList(const string& s,int id);   //返回unique words 数量
 	int splitIntoGram(const string& s,int q,vector<string>& result);
@@ -59,7 +61,8 @@ public:
 	SimSearcher();
 	~SimSearcher();
 
-	int createIndex(const char *filename, unsigned q);
+	int edCreateIndex(const char *filename, unsigned q);
+	int jaccardCreateIndex(const char *filename);
 	int searchJaccard(const char *query, double threshold, std::vector<std::pair<unsigned, double> > &result);
 	int searchED(const char *query, unsigned threshold, std::vector<std::pair<unsigned, unsigned> > &result);
 };
@@ -67,10 +70,12 @@ public:
 class SimJoiner{
 public:
 	SimSearcher searcher;
-	vector<string> queries;
+	vector<string> ed_queries;
+	vector<string> jaccard_queries;
 	SimJoiner();
 	~SimJoiner();
-	int readQuery(const string filename);
+	int readEdQuery(const string filename);
+	int readJaccardQuery(const string filename);
 	int joinJaccard(const char *filename1, const char *filename2, double threshold, std::vector<JaccardJoinResult> &result);
 	int joinED(const char *filename1, const char *filename2, unsigned threshold, std::vector<EDJoinResult> &result);
 	void test(string filename1,string filename2);
