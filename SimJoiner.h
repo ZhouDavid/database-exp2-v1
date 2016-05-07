@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <cmath>
@@ -23,7 +24,6 @@ typedef JoinResult<unsigned, unsigned> EDJoinResult;
 const int SUCCESS = 0;
 const int FAILURE = 1;
 
-class LengthGroup;
 class InvList{
 public:
     int id;
@@ -88,6 +88,27 @@ public:
     }
 
 };
+class Partition{
+public:
+   // int id;//组号
+    unordered_map<string,vector<int>> invlist;
+    unordered_map<string,vector<int>> neighbor_invlist; //1-deletion neighborhood
+};
+class JacGroup{
+public:
+    int size;  //该group元素数目
+    int m;
+    vector<int> V;//allocation 数组
+    unordered_map<int,Partition> partitions;  //所有分组 key代表分组
+
+    void gen_partitions(const vector<string>& set,int id,unordered_map<string,int>& universe){
+        int group_id = 0;
+        for(int i = 0;i<set.size();i++){
+            group_id = ceil(double(universe[set[i]])/double(m));
+            partitions[group_id].invlist[set[i]].push_back(id);
+        }
+    }
+};
 
 class SimJoiner {
 public:
@@ -100,6 +121,7 @@ public:
     SimJoiner();
     ~SimJoiner();
 
+public : // for compute ed
     int joinJaccard(const char *filename1, const char *filename2, double threshold, std::vector<JaccardJoinResult> &result);
     int joinED(const char *filename1, const char *filename2, unsigned threshold, std::vector<EDJoinResult> &result);
     void readData(string filename,int tau);
@@ -107,10 +129,30 @@ public:
     void gen_group_lens();
     void gen_candidate(const string& query,int tau,vector<int>&candidate);
     void gen_substrs(const string&,int,int,int,int,int,vector<string>&substrs);
-    void verify(int id2,const string& query,const vector<int>&candidate,int tau,vector<EDJoinResult>&result);
+    void verify(int id1,const string& query,const vector<int>&candidate,int tau,vector<EDJoinResult>&result);
     void test(string filename1,string filename2);
     int calED(const string& s1,const string& s2,int tau);
     static int min3(int a,int b,int c){int t = a<b?a:b;return t<c?t:c;}
     static bool sort_result(const EDJoinResult& r1,const EDJoinResult& r2);
+
+public:  //for compute jaccard
+    vector<vector<string>> jac_records;
+    vector<vector<string>> jac_queries;
+    unordered_map<int,JacGroup> jac_groups;
+    vector<string> U;
+    unordered_map<string,int> universe;
+    vector<int>group_sizes;
+
+    static int H(int l,int s,double tau);
+    static int H(int l,double tau);
+    static void split(const string& str,char s,vector<string>&words);
+    static double calJaccard(vector<string>& s1,vector<string>&s2,double tau);
+
+
+    void readJacQuery(string filename);
+    void readJacData(string filename);
+    void jac_init(double tau);
+    void gen_jac_candidate(const vector<string>& query,vector<int>& candidate,double tau);
+    void verify(int id1,vector<string>& query,vector<int>&candidate,double tau,vector<JaccardJoinResult>&result);
 };
 #endif
