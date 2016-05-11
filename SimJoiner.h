@@ -136,13 +136,13 @@ public : // for compute ed
     static bool sort_result(const EDJoinResult& r1,const EDJoinResult& r2);
 
 public:  //for compute jaccard
-    vector<vector<string>> jac_records;
-    vector<vector<string>> jac_queries;
+    vector<vector<string>>jac_records;
+    vector<vector<string>>jac_queries;
     unordered_map<int,JacGroup> jac_groups;
-    vector<string> U;
     unordered_map<string,int> universe;
     vector<int>group_sizes;
-
+    int wid = 0;
+    bool there = false;
     static int H(int l,int s,double tau);
     static int H(int l,double tau);
     static void split(const string& str,char s,vector<string>&words);
@@ -153,6 +153,6 @@ public:  //for compute jaccard
     void readJacData(string filename);
     void jac_init(double tau);
     void gen_jac_candidate(const vector<string>& query,vector<int>& candidate,double tau);
-    void verify(int id1,vector<string>& query,vector<int>&candidate,double tau,vector<JaccardJoinResult>&result);
+    void jac_verify(int id1,vector<string>& query,vector<int>&candidate,double tau,vector<JaccardJoinResult>&result);
 };
 #endif

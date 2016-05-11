@@ -3,6 +3,7 @@
 using namespace std;
 
 SimJoiner::SimJoiner() {
+
 }
 
 SimJoiner::~SimJoiner() {
@@ -10,14 +11,14 @@ SimJoiner::~SimJoiner() {
 
 int SimJoiner::joinJaccard(const char *filename1, const char *filename2, double threshold, vector<JaccardJoinResult> &result) {
     result.clear();
-    readJacData(string(filename1));
-    readJacQuery(string(filename2));
-    jac_init(threshold);
+    readJacData(string(filename1));  //0.89s
+    readJacQuery(string(filename2)); //0.085s
+    jac_init(threshold);        //1.39s
     vector<int> candidate;
     for(int i = 0;i<jac_queries.size();i++){
         candidate.clear();
         gen_jac_candidate(jac_queries[i],candidate,threshold);
-        verify(i,jac_queries[i],candidate,threshold,result);
+        jac_verify(i,jac_queries[i],candidate,threshold,result);  //很耗时
     }
     return SUCCESS;
 }
@@ -105,6 +106,8 @@ void SimJoiner::test(string filename1,string filename2){
         cout<<resultJaccard[i].id1<<' '<<resultJaccard[i].id2<<' '<<resultJaccard[i].s<<endl;
     }
     cout<<"total records number:"<< resultJaccard.size()<<endl;
+
+
 }
 
 void SimJoiner::gen_group_lens() {
@@ -222,14 +225,19 @@ int SimJoiner::H(const int l,const double tau){
 void SimJoiner::readJacQuery(string filename){
     ifstream fin(filename);
     string q;
-    vector<string> words;
+    int i =0;
+    vector<string> tp;
     while(getline(fin,q)){
-        words.clear();
-        split(q,' ',words);
-        sort(words.begin(),words.end());
-        words.erase(unique(words.begin(),words.end()),words.end());
-        jac_queries.push_back(words);
-        for(int i = 0;i<words.size();i++) U.push_back(words[i]);  //生成universe
+        jac_queries.push_back(tp);
+        split(q,' ',jac_queries[i]);
+        sort(jac_queries[i].begin(),jac_queries[i].end());
+        jac_queries[i].erase(unique(jac_queries[i].begin(),jac_queries[i].end()),jac_queries[i].end());
+        for(int j = 0;j<jac_queries[i].size();j++){
+            if(universe.find(jac_queries[i][j])==universe.end()){
+                universe[jac_queries[i][j]] = ++wid;
+            }
+        }
+        i++;
     }
     fin.close();
 }
@@ -237,14 +245,17 @@ void SimJoiner::readJacQuery(string filename){
 void SimJoiner::readJacData(string filename){
     ifstream fin(filename);
     string r;
-    vector<string> words;
+    int i = 0;
+    vector<string> tp;
     while(getline(fin,r)){
-        words.clear();
-        split(r,' ',words);
-        sort(words.begin(),words.end());
-        words.erase(unique(words.begin(),words.end()),words.end());
-        jac_records.push_back(words);
-        for(int i = 0;i<words.size();i++) U.push_back(words[i]); //生成universe
+        jac_records.push_back(tp);
+        split(r,' ',jac_records[i]);
+        sort(jac_records[i].begin(),jac_records[i].end());
+        jac_records[i].erase(unique(jac_records[i].begin(),jac_records[i].end()),jac_records[i].end());
+        for(int j = 0;j<jac_records[i].size();j++){
+            universe[jac_records[i][j]] = ++wid;
+        }
+        i++;
     }
     fin.close();
 }
@@ -265,27 +276,23 @@ void SimJoiner::split(const string& str,char s,vector<string>&words){
 }
 
 void SimJoiner::jac_init(double tau){
-    //U的排序及去重
-    sort(U.begin(),U.end());
-    U.erase(unique(U.begin(),U.end()),U.end());
-
-    //生成universe序号表
-    for(int i = 0;i<U.size();i++){
-        universe[U[i]] = i+1;
-    }
 
     //按照长度分组生成groups
+    double u_size=universe.size();
+    double wid;
+    double gid;
+    double group_num;  //每组记录数
+    double m;
     for(int i = 0;i<jac_records.size();i++){
         int size = jac_records[i].size();
         jac_groups[size].size = size;
-        double m = jac_groups[size].m = H(size,tau)+1;
+        m = jac_groups[size].m = H(size,tau)+1;
         unordered_map<int,string>tmp;
-        double wid;
-        int gid;
         for(int j = 0;j<jac_records[i].size();j++){
-             wid= universe[jac_records[i][j]];
-             gid= ceil(wid/m);
-             tmp[gid]+=(jac_records[i][j]+" ");
+            wid= universe[jac_records[i][j]];
+            group_num = ceil(u_size/m);
+            gid = ceil(wid/group_num);
+            tmp[gid]+=(jac_records[i][j]+" ");
         }
         for(unordered_map<int,string>::iterator it = tmp.begin();it!=tmp.end();it++){
             jac_groups[size].partitions[it->first].invlist[it->second].push_back(i);
@@ -296,43 +303,52 @@ void SimJoiner::jac_init(double tau){
     for(unordered_map<int,JacGroup>::iterator it = jac_groups.begin();it!=jac_groups.end();it++){
         group_sizes.push_back(it->first);
     }
+    group_sizes.erase(unique(group_sizes.begin(),group_sizes.end()),group_sizes.end());
     sort(group_sizes.begin(),group_sizes.end());
 }
 
 void SimJoiner::gen_jac_candidate(const vector<string>& query,vector<int>& candidate,double tau){
-    int lsize = ceil(double(query.size())*tau);  //下界
-    int usize = floor(double(query.size())/tau); //上界
+    double lsize = ceil(double(query.size())*tau);  //下界
+    double usize = floor(double(query.size())/tau); //上界
     vector<int>::iterator it = lower_bound(group_sizes.begin(),group_sizes.end(),lsize);
     unordered_map<int,string> tmp;
+    int gid;
+    double group_num;
+    double m;
+    double u_size=universe.size();
+    double wid;
+    unordered_map<string,vector<int>>* pointer;
     for(;it!=group_sizes.end();it++){
         tmp.clear();
         if(*it>usize) break;
-        double m = H(*it,tau)+1;   //要分成的组数
+        m = H(*it,tau)+1;   //要分成的组数
 
         for(int j = 0;j<query.size();j++){
-            double wid = universe[query[j]];
-            int gid = ceil(wid/m);
+            wid = universe[query[j]];
+            group_num = ceil(u_size/m);
+            gid = ceil(wid/group_num);
             tmp[gid]+=query[j]+" ";
         }
-
-        unordered_map<string,vector<int>>* pointer;
         for(unordered_map<int,string>::iterator iit=tmp.begin();iit!=tmp.end();iit++){
-            int gid = iit->first;
+            gid = iit->first;
             pointer = &jac_groups[*it].partitions[gid].invlist;
             if(pointer->find(tmp[gid])!=pointer->end()){
+//                vector<int>ttmp = (*pointer)[tmp[gid]];
+//                vector<string>tttmp = jac_records[441];
                 for(int j = 0;j<(*pointer)[tmp[gid]].size();j++){
                     candidate.push_back((*pointer)[tmp[gid]][j]);
                 }
             }
         }
-        delete pointer;
     }
+    pointer = NULL;
+    delete pointer;
     sort(candidate.begin(),candidate.end());
     candidate.erase(unique(candidate.begin(),candidate.end()),candidate.end());
 }
 
-void SimJoiner::verify(int id1,vector<string>& query,vector<int>&candidate,double tau,vector<JaccardJoinResult>&result){
-    double jac;
+void SimJoiner::jac_verify(int id1,vector<string>& query,vector<int>&candidate,double tau,vector<JaccardJoinResult>&result){
+    double jac = 0;
     for(int i = 0;i<candidate.size();i++){
         jac = calJaccard(query,jac_records[candidate[i]],tau);
         if(jac>=tau){

@@ -71,7 +71,7 @@ class SimJoiner{
 public:
 	SimSearcher searcher;
 	vector<string> ed_queries;
-	vector<string> jaccard_queries;
+	vector<string> 	jaccard_queries;
 	SimJoiner();
 	~SimJoiner();
 	int readEdQuery(const string filename);

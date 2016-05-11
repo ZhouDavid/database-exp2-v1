@@ -3,7 +3,7 @@
 #include <string>
 #include <ctime>
 #include <cstdlib>
-#define RECORD_NUM 1000
+#define RECORD_NUM 30000
 using namespace std;
 int main(){
 	srand((unsigned)time(NULL));

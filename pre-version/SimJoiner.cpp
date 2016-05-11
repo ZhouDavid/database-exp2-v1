@@ -52,7 +52,6 @@ int SimSearcher::jaccardCreateIndex(const char *filename)
     smin = 1023;
     while(getline(fin,line)){
         jaccardRecords.push_back(line);
-        //updateList(line,id);
         int word_size = updateWordList(line,id);
         word_counter.push_back(word_size);
         if(smin > word_size)smin = word_size;
@@ -83,7 +82,9 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
         for(int i = 0;i<size;i++){
             int id = candidate[i];
             double jaccard = double(counters[id])/double(word_counter[id]+word_size-counters[id]);
-            if(jaccard>=threshold) result.push_back(pair<unsigned,double>(id,jaccard));
+            if(jaccard>=threshold) {
+                result.push_back(pair<unsigned,double>(id,jaccard));
+            }
         }
     }
     else{
@@ -197,8 +198,6 @@ int SimSearcher::calED(const string& s1,const string& s2,int threshold) {   //s2
     }
     return d[row][col];
 }
-
-
 
 
 int SimSearcher::splitIntoGram(const string& s,int q,vector<string>& result){
@@ -478,8 +477,8 @@ int SimJoiner::joinED(const char *filename1, const char *filename2, unsigned thr
 
 int SimJoiner::joinJaccard(const char *filename1, const char *filename2, double threshold, std::vector<JaccardJoinResult> &result){
     result.clear();
-    readJaccardQuery(filename1);
-    searcher.jaccardCreateIndex(filename2);
+    readJaccardQuery(filename2);
+    searcher.jaccardCreateIndex(filename1);
     vector<pair<unsigned,double>>res;
     for(int i = 0;i<jaccard_queries.size();i++){
         searcher.searchJaccard(jaccard_queries[i].c_str(),threshold,res);
@@ -502,7 +501,7 @@ void SimJoiner::test(string filename1,string filename2){
 //    }
 //    cout<<"total records number:"<< resultED.size()<<endl;
     vector<JaccardJoinResult> resultJaccard;
-    double tau = 0.75;
+    double tau = 0.73;
     joinJaccard(filename1.c_str(),filename2.c_str(),tau,resultJaccard);
     for(int i=0;i<resultJaccard.size();i++){
         cout<<resultJaccard[i].id1<<' '<<resultJaccard[i].id2<<' '<<resultJaccard[i].s<<endl;
